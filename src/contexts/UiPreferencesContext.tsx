@@ -5,6 +5,7 @@ type AnimationSpeed = "fast" | "normal" | "relaxed";
 interface UiPreferencesContextType {
     animationSpeed: AnimationSpeed;
     setAnimationSpeed: (speed: AnimationSpeed) => void;
+    animationMultiplier: number; // For JS-based physics (framer-motion)
 }
 
 const UiPreferencesContext = createContext<UiPreferencesContextType | undefined>(undefined);
@@ -15,26 +16,31 @@ export const UiPreferencesProvider: React.FC<{ children: React.ReactNode }> = ({
         return (saved as AnimationSpeed) || "normal";
     });
 
+    const getMultiplier = (speed: AnimationSpeed) => {
+        switch (speed) {
+            case "fast": return 0.5;
+            case "relaxed": return 2.0;
+            default: return 1.0;
+        }
+    };
+
+    const animationMultiplier = getMultiplier(animationSpeed);
+
     useEffect(() => {
         localStorage.setItem("ui-animation-speed", animationSpeed);
 
         // update CSS variables for global animation control if needed
         const root = document.documentElement;
-        switch (animationSpeed) {
-            case "fast":
-                root.style.setProperty("--duration-factor", "0.5");
-                break;
-            case "relaxed":
-                root.style.setProperty("--duration-factor", "2.0");
-                break;
-            default:
-                root.style.setProperty("--duration-factor", "1.0");
-        }
+        root.style.setProperty("--duration-factor", animationMultiplier.toString());
 
-    }, [animationSpeed]);
+    }, [animationSpeed, animationMultiplier]);
 
     return (
-        <UiPreferencesContext.Provider value={{ animationSpeed, setAnimationSpeed }}>
+        <UiPreferencesContext.Provider value={{
+            animationSpeed,
+            setAnimationSpeed,
+            animationMultiplier
+        }}>
             {children}
         </UiPreferencesContext.Provider>
     );

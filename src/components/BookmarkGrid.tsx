@@ -1,6 +1,10 @@
 import { AnimatePresence } from "framer-motion";
 import { Bookmark, Category } from "@/types/bookmark";
-import { BookmarkCard } from "./BookmarkCard";
+import { SortableBookmarkCard } from "./SortableBookmarkCard";
+import {
+  SortableContext,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
@@ -8,6 +12,7 @@ interface BookmarkGridProps {
   onEdit: (bookmark: Bookmark) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onReorder: (activeId: string, overId: string) => void;
 }
 
 export function BookmarkGrid({
@@ -16,6 +21,7 @@ export function BookmarkGrid({
   onEdit,
   onDelete,
   onTogglePin,
+  onReorder,
 }: BookmarkGridProps) {
   const getCategoryById = (id: string) => categories.find((c) => c.id === id);
 
@@ -30,20 +36,22 @@ export function BookmarkGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-      <AnimatePresence mode="popLayout">
-        {bookmarks.map((bookmark, index) => (
-          <BookmarkCard
-            key={bookmark.id}
-            bookmark={bookmark}
-            category={getCategoryById(bookmark.category)}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onTogglePin={onTogglePin}
-            index={index}
-          />
-        ))}
-      </AnimatePresence>
-    </div>
+    <SortableContext items={bookmarks.map((b) => b.id)} strategy={rectSortingStrategy}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <AnimatePresence mode="popLayout">
+          {bookmarks.map((bookmark, index) => (
+            <SortableBookmarkCard
+              key={bookmark.id}
+              bookmark={bookmark}
+              category={getCategoryById(bookmark.category)}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onTogglePin={onTogglePin}
+              index={index}
+            />
+          ))}
+        </AnimatePresence>
+      </div>
+    </SortableContext>
   );
 }

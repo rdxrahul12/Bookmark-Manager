@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Link, Tag } from "lucide-react";
 import { Bookmark, Category } from "@/types/bookmark";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { useUiPreferences } from "@/contexts/UiPreferencesContext";
 
 interface AddBookmarkModalProps {
   isOpen: boolean;
@@ -24,6 +26,8 @@ export function AddBookmarkModal({
   const [category, setCategory] = useState(categories[0]?.id || "other");
   const [isPinned, setIsPinned] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const { toast } = useToast();
+  const { animationMultiplier } = useUiPreferences();
 
   // Reset form when modal opens or editingBookmark changes
   useEffect(() => {
@@ -38,9 +42,20 @@ export function AddBookmarkModal({
   const handleSave = useCallback(() => {
     if (!title.trim() || !url.trim()) return;
 
-    let finalUrl = url;
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      finalUrl = "https://" + url;
+    let finalUrl = url.trim();
+    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+      finalUrl = "https://" + finalUrl;
+    }
+
+    try {
+      new URL(finalUrl);
+    } catch {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid website address.",
+        variant: "destructive",
+      });
+      return;
     }
 
     onSave({
@@ -87,7 +102,7 @@ export function AddBookmarkModal({
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              transition={{ type: "spring", stiffness: 300 / animationMultiplier, damping: 25 }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
@@ -144,8 +159,8 @@ export function AddBookmarkModal({
                         key={cat.id}
                         onClick={() => setCategory(cat.id)}
                         className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 ${category === cat.id
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-foreground"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-secondary text-foreground"
                           }`}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
@@ -161,8 +176,8 @@ export function AddBookmarkModal({
                 <motion.button
                   onClick={() => setIsPinned(!isPinned)}
                   className={`w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 ${isPinned
-                      ? "bg-primary text-primary-foreground"
-                      : "neu-raised-sm text-foreground"
+                    ? "bg-primary text-primary-foreground"
+                    : "neu-raised-sm text-foreground"
                     }`}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}

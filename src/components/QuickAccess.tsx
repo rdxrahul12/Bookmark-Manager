@@ -1,12 +1,15 @@
 import { motion } from "framer-motion";
 import { Bookmark } from "@/types/bookmark";
 import { Favicon } from "./Favicon";
+import { useUiPreferences } from "@/contexts/UiPreferencesContext";
 
 interface QuickAccessProps {
   bookmarks: Bookmark[];
 }
 
 export function QuickAccess({ bookmarks }: QuickAccessProps) {
+  const { animationMultiplier } = useUiPreferences();
+
   if (bookmarks.length === 0) return null;
 
   return (
@@ -24,14 +27,14 @@ export function QuickAccess({ bookmarks }: QuickAccessProps) {
             animate={{ opacity: 1, scale: 1 }}
             transition={{
               type: "spring",
-              stiffness: 300,
+              stiffness: 300 / animationMultiplier,
               damping: 20,
-              delay: index * 0.05,
+              delay: index * 0.05 * animationMultiplier,
             }}
             whileHover={{
               scale: 1.15,
               y: -4,
-              transition: { type: "spring", stiffness: 400, damping: 10 },
+              transition: { type: "spring", stiffness: 400 / animationMultiplier, damping: 10 },
             }}
             whileTap={{ scale: 0.9 }}
             title={bookmark.title}

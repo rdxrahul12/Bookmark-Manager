@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle, X } from "lucide-react";
+import { useUiPreferences } from "@/contexts/UiPreferencesContext";
 
 interface ConfirmationModalProps {
     isOpen: boolean;
@@ -20,6 +21,8 @@ export function ConfirmationModal({
     confirmText = "Delete",
     cancelText = "Cancel",
 }: ConfirmationModalProps) {
+    const { animationMultiplier } = useUiPreferences();
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -45,7 +48,7 @@ export function ConfirmationModal({
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                            transition={{ type: "spring", stiffness: 300 / animationMultiplier, damping: 25 }}
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex flex-col items-center text-center space-y-4">

@@ -1,7 +1,13 @@
 import { motion } from "framer-motion";
-import { Plus, X } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Category } from "@/types/bookmark";
 import { useState } from "react";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { SortableCategoryTab } from "./SortableCategoryTab";
+import { useUiPreferences } from "@/contexts/UiPreferencesContext";
 
 interface CategoryFilterProps {
   categories: Category[];
@@ -10,6 +16,7 @@ interface CategoryFilterProps {
   onAddCategory: () => void;
   onDeleteCategory: (id: string) => void;
   onDropUrl?: (url: string, categoryId: string) => void;
+  onReorderCategory?: (activeId: string, overId: string) => void;
 }
 
 import { ConfirmationModal } from "./ConfirmationModal";
@@ -21,7 +28,9 @@ export function CategoryFilter({
   onAddCategory,
   onDeleteCategory,
   onDropUrl,
+  onReorderCategory,
 }: CategoryFilterProps) {
+  const { animationMultiplier } = useUiPreferences();
   const [dragOverId, setDragOverId] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
@@ -75,59 +84,28 @@ export function CategoryFilter({
             }`}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          transition={{ type: "spring", stiffness: 400 / animationMultiplier, damping: 17 }}
         >
           All
         </motion.button>
 
         {/* Category pills */}
-        {categories.map((category, index) => (
-          <motion.div
-            key={category.id}
-            className="relative group"
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 20,
-              delay: index * 0.03,
-            }}
-          >
-            <motion.button
-              onClick={() => onSelectCategory(category.id)}
-              onDragOver={(e) => handleDragOver(e, category.id)}
+        <SortableContext items={categories.map(c => c.id)} strategy={horizontalListSortingStrategy}>
+          {categories.map((category, index) => (
+            <SortableCategoryTab
+              key={category.id}
+              category={category}
+              selectedCategory={selectedCategory}
+              dragOverId={dragOverId}
+              index={index}
+              onSelectCategory={onSelectCategory}
+              onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, category.id)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-all ${dragOverId === category.id
-                ? "bg-primary text-primary-foreground ring-2 ring-primary ring-offset-2 scale-110"
-                : selectedCategory === category.id
-                  ? "bg-primary text-primary-foreground glow-primary"
-                  : "bg-card neu-raised-sm text-foreground"
-                }`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
-            >
-              <span>{category.name}</span>
-            </motion.button>
-
-            {/* Delete button - appears on hover */}
-            {!["social", "work", "entertainment", "news", "shopping", "other"].includes(category.id) && (
-              <motion.button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  confirmDelete(category);
-                }}
-                className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                whileHover={{ scale: 1.2 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <X className="h-3 w-3" />
-              </motion.button>
-            )}
-          </motion.div>
-        ))}
+              onDrop={handleDrop}
+              confirmDelete={confirmDelete}
+            />
+          ))}
+        </SortableContext>
 
         {/* Add category button */}
         <motion.button
@@ -135,7 +113,7 @@ export function CategoryFilter({
           className="h-9 w-9 rounded-xl bg-card neu-raised-sm flex items-center justify-center text-primary"
           whileHover={{ scale: 1.1, rotate: 90 }}
           whileTap={{ scale: 0.9 }}
-          transition={{ type: "spring", stiffness: 300, damping: 15 }}
+          transition={{ type: "spring", stiffness: 300 / animationMultiplier, damping: 15 }}
         >
           <Plus className="h-5 w-5" />
         </motion.button>

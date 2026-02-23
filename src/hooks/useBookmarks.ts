@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Bookmark, Category, DEFAULT_CATEGORIES, SAMPLE_BOOKMARKS } from "@/types/bookmark";
-import { uploadFaviconToCloudinary } from "@/utils/cloudinaryService";
-import { getDomain } from "@/utils/faviconUtils";
+import { arrayMove } from "@dnd-kit/sortable";
 
 const BOOKMARKS_KEY = "bookmark-manager-bookmarks";
 const CATEGORIES_KEY = "bookmark-manager-categories";
@@ -53,16 +52,6 @@ export function useBookmarks() {
     };
     setBookmarks((prev) => [...prev, newBookmark]);
 
-    // Trigger background upload to Cloudinary
-    const domain = getDomain(newBookmark.url);
-    if (domain) {
-      // Source: Google Favicon API (High Res)
-      const sourceUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-      uploadFaviconToCloudinary(domain, sourceUrl).catch(err =>
-        console.error("Background icon upload failed:", err)
-      );
-    }
-
     return newBookmark;
   }, []);
 
@@ -113,6 +102,24 @@ export function useBookmarks() {
     setCategories((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
+  const reorderBookmarks = useCallback((activeId: string, overId: string) => {
+    setBookmarks((prev) => {
+      const oldIndex = prev.findIndex((b) => b.id === activeId);
+      const newIndex = prev.findIndex((b) => b.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }, []);
+
+  const reorderCategories = useCallback((activeId: string, overId: string) => {
+    setCategories((prev) => {
+      const oldIndex = prev.findIndex((c) => c.id === activeId);
+      const newIndex = prev.findIndex((c) => c.id === overId);
+      if (oldIndex === -1 || newIndex === -1) return prev;
+      return arrayMove(prev, oldIndex, newIndex);
+    });
+  }, []);
+
   const exportData = useCallback(() => {
     // Map internal state back to external format
     const externalBookmarks = bookmarks.map(b => ({
@@ -153,8 +160,8 @@ export function useBookmarks() {
         try {
           const rawData = JSON.parse(e.target?.result as string);
 
-          let importedBookmarks: any[] = [];
-          let importedCategories: any[] = [];
+          let importedBookmarks: unknown[] = [];
+          let importedCategories: unknown[] = [];
 
           // Determine structure
           if (Array.isArray(rawData)) {
@@ -167,22 +174,22 @@ export function useBookmarks() {
           }
 
           // Map and validate Categories
-          const validCategories: Category[] = importedCategories.map((c: any) => ({
-            id: c.id || crypto.randomUUID(),
-            name: c.name || "Untitled Category",
-            emoji: c.emoji || "📁",
-            color: c.color
+          const validCategories: Category[] = (importedCategories as Record<string, unknown>[]).map((c) => ({
+            id: (c.id as string) || crypto.randomUUID(),
+            name: (c.name as string) || "Untitled Category",
+            emoji: (c.emoji as string) || "📁",
+            color: c.color as string | undefined
           }));
 
           // Map and validate Bookmarks
-          const validBookmarks: Bookmark[] = importedBookmarks.map((b: any) => ({
-            id: b.id || crypto.randomUUID(),
-            title: b.title || b.name || "Untitled Bookmark",
-            url: b.url || "",
-            favicon: b.favicon,
-            category: b.category || b.categoryId || "other",
-            isPinned: b.isPinned || false,
-            createdAt: b.createdAt || b.lastUsed || Date.now(),
+          const validBookmarks: Bookmark[] = (importedBookmarks as Record<string, unknown>[]).map((b) => ({
+            id: (b.id as string) || crypto.randomUUID(),
+            title: (b.title || b.name || "Untitled Bookmark") as string,
+            url: (b.url as string) || "",
+            favicon: b.favicon as string | undefined,
+            category: (b.category || b.categoryId || "other") as string,
+            isPinned: (b.isPinned as boolean) || false,
+            createdAt: (b.createdAt || b.lastUsed || Date.now()) as number,
           }));
 
           if (validBookmarks.length > 0) setBookmarks(validBookmarks);
@@ -223,6 +230,8 @@ export function useBookmarks() {
     exportData,
     importData,
     getPinnedBookmarks,
+    reorderBookmarks,
+    reorderCategories,
     getBookmarksByCategory,
   };
 }

@@ -34,21 +34,11 @@ export const getColorForDomain = (domain: string): string => {
 /**
  * Constructs favicon URLs for different providers
  */
-export const getFaviconUrl = (url: string, provider: 'cloudinary' | 'google' | 'ddg' = 'cloudinary'): string => {
+export const getFaviconUrl = (url: string, provider: 'google' | 'ddg' = 'google'): string => {
     const domain = getDomain(url);
     if (!domain) return "";
 
-    const CLOUD_NAME = "dsupi8dff"; // Using provided cloud name
-
     switch (provider) {
-        case 'cloudinary':
-            // Fetch google icon via cloudinary for caching/optimization
-            // f_auto,q_auto: optimization
-            // w_80,h_80: resize to double size (for 40px display) for retina
-            // c_fill: fill mode
-            const targetUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-            return `https://res.cloudinary.com/${CLOUD_NAME}/image/fetch/f_auto,q_auto,w_80,h_80,c_fill,r_max/${targetUrl}`;
-
         case 'google':
             return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 

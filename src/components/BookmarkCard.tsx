@@ -24,22 +24,9 @@ export function BookmarkCard({
 }: BookmarkCardProps) {
   const [isPressed, setIsPressed] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const { animationSpeed } = useUiPreferences();
+  const { animationSpeed, animationMultiplier } = useUiPreferences();
 
-
-
-  const getTransition = () => {
-    switch (animationSpeed) {
-      case "fast":
-        return { type: "spring", stiffness: 800, damping: 35, delay: index * 0.01 } as const;
-      case "relaxed":
-        return { type: "spring", stiffness: 400, damping: 30, delay: index * 0.03 } as const;
-      default:
-        return { type: "spring", stiffness: 600, damping: 30, delay: index * 0.015 } as const;
-    }
-  };
-
-  const transition = getTransition();
+  const transition = { type: "spring", stiffness: 600 / animationMultiplier, damping: 30, delay: index * 0.015 * animationMultiplier } as const;
 
   return (
     <motion.div
@@ -47,7 +34,7 @@ export function BookmarkCard({
       className={`relative group w-[90%] mx-auto ${isHovered ? "z-50" : "z-0"}`}
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.1 } }}
+      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.1 * animationMultiplier } }}
       transition={transition}
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
@@ -71,7 +58,7 @@ export function BookmarkCard({
         onMouseUp={() => setIsPressed(false)}
         onMouseLeave={() => setIsPressed(false)}
         transition={{ ...transition, delay: 0 }}
-        onClick={() => window.open(bookmark.url, "_blank")}
+        onClick={() => window.open(bookmark.url, "_blank", "noopener,noreferrer")}
       >
         {/* Favicon */}
         <div className="relative mb-3">
@@ -102,7 +89,7 @@ export function BookmarkCard({
           scale: isHovered || bookmark.isPinned ? 1 : 0.9,
           x: isHovered || bookmark.isPinned ? 0 : -10,
         }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.2 * animationMultiplier }}
         onClick={(e) => {
           e.stopPropagation();
           onTogglePin(bookmark.id);
@@ -121,7 +108,7 @@ export function BookmarkCard({
           scale: isHovered ? 1 : 0.9,
           x: isHovered ? 0 : 10,
         }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.2 * animationMultiplier }}
         onClick={(e) => e.stopPropagation()}
       >
         <button

@@ -1,0 +1,18 @@
+{
+    "manifest_version": 3,
+    "name": "Bookmark Delight",
+    "version": "1.0",
+    "description": "Manage your bookmarks with ease",
+    "chrome_url_overrides": {
+        "newtab": "index.html"
+    },
+    "permissions": [
+        "storage",
+        "unlimitedStorage",
+        "tabs"
+    ],
+    "host_permissions": [
+        "https://www.google.com/s2/favicons/*",
+        "https://icons.duckduckgo.com/*"
+    ]
+}

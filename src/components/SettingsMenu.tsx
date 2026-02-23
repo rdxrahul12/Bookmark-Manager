@@ -26,7 +26,7 @@ interface SettingsMenuProps {
 }
 
 export function SettingsMenu({ onExport, onImport, theme, onToggleTheme, categories, onUpdateCategory }: SettingsMenuProps) {
-    const { animationSpeed, setAnimationSpeed } = useUiPreferences();
+    const { animationSpeed, setAnimationSpeed, animationMultiplier } = useUiPreferences();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [importSuccess, setImportSuccess] = useState(false);
     const [exportSuccess, setExportSuccess] = useState(false);
@@ -122,7 +122,7 @@ export function SettingsMenu({ onExport, onImport, theme, onToggleTheme, categor
                         <h4 className="font-medium leading-none">Animation Speed</h4>
                         <RadioGroup
                             defaultValue={animationSpeed}
-                            onValueChange={(value) => setAnimationSpeed(value as any)}
+                            onValueChange={(value) => setAnimationSpeed(value as "fast" | "normal" | "relaxed")}
                             className="grid grid-cols-3 gap-4"
                         >
                             <div>
@@ -165,7 +165,7 @@ export function SettingsMenu({ onExport, onImport, theme, onToggleTheme, categor
                                     className="flex items-center gap-2 p-2 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: index * 0.05, type: "spring", stiffness: 300, damping: 25 }}
+                                    transition={{ delay: index * 0.05 * animationMultiplier, type: "spring", stiffness: 300 / animationMultiplier, damping: 25 }}
                                     layout
                                 >
                                     <AnimatePresence mode="wait">
@@ -176,7 +176,7 @@ export function SettingsMenu({ onExport, onImport, theme, onToggleTheme, categor
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.95 }}
-                                                transition={{ duration: 0.15 }}
+                                                transition={{ duration: 0.15 * animationMultiplier }}
                                             >
                                                 <Input
                                                     value={editValue}
@@ -203,7 +203,7 @@ export function SettingsMenu({ onExport, onImport, theme, onToggleTheme, categor
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.95 }}
-                                                transition={{ duration: 0.15 }}
+                                                transition={{ duration: 0.15 * animationMultiplier }}
                                             >
                                                 <span className="flex-1 text-sm truncate">{cat.name}</span>
                                                 <motion.div whileHover={{ scale: 1.15, rotate: 15 }} whileTap={{ scale: 0.9 }}>

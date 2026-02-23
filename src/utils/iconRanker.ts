@@ -1,8 +1,7 @@
 import { getFaviconUrl, getDomain } from "./faviconUtils";
-import { getCloudinaryFaviconUrl } from "./cloudinaryService";
 
 interface IconCandidate {
-    source: 'cloudinary' | 'google' | 'ddg';
+    source: 'google' | 'ddg';
     url: string;
     width: number;
     height: number;
@@ -36,13 +35,10 @@ export const findBestFavicon = async (pageUrl: string): Promise<IconCandidate | 
     if (!domain) return null;
 
     const candidates: Promise<IconCandidate | null>[] = [
-        // 1. Cloudinary (Our Cache)
-        probeImage(getCloudinaryFaviconUrl(domain), 'cloudinary'),
-
-        // 2. Google (High Res)
+        // 1. Google (High Res)
         probeImage(getFaviconUrl(pageUrl, 'google'), 'google'),
 
-        // 3. DuckDuckGo (Backup)
+        // 2. DuckDuckGo (Backup)
         probeImage(getFaviconUrl(pageUrl, 'ddg'), 'ddg'),
     ];
 
@@ -62,12 +58,12 @@ export const findBestFavicon = async (pageUrl: string): Promise<IconCandidate | 
 
     if (validIcons.length === 0) return null;
 
-    // Sort by Size (Descending) -> Then by Priority (Cloudinary first)
+    // Sort by Size (Descending) -> Then by Priority (Google first)
     validIcons.sort((a, b) => {
         if (b.width !== a.width) return b.width - a.width;
-        // If sizes are equal, prefer Cloudinary
-        if (a.source === 'cloudinary') return -1;
-        if (b.source === 'cloudinary') return 1;
+        // If sizes are equal, prefer Google
+        if (a.source === 'google') return -1;
+        if (b.source === 'google') return 1;
         return 0;
     });
 

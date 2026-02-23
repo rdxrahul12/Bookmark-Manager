@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
-import { getDomain, getColorForDomain } from "@/utils/faviconUtils";
-import { getCloudinaryFaviconUrl, uploadFaviconToCloudinary } from "@/utils/cloudinaryService";
+import { getDomain, getColorForDomain, getFaviconUrl } from "@/utils/faviconUtils";
 import { findBestFavicon } from "@/utils/iconRanker";
 import { iconCache } from "@/utils/iconCache";
 import { motion } from "framer-motion";
+import { useUiPreferences } from "@/contexts/UiPreferencesContext";
 
 interface FaviconProps {
     url: string;
@@ -13,36 +13,34 @@ interface FaviconProps {
 }
 
 export function Favicon({ url, title, size = 40, className = "" }: FaviconProps) {
+    const { animationMultiplier } = useUiPreferences();
     const [displayUrl, setDisplayUrl] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const domain = getDomain(url);
     const color = useMemo(() => getColorForDomain(domain), [domain]);
-    const cloudUrl = useMemo(() => domain ? getCloudinaryFaviconUrl(domain) : null, [domain]);
+    const googleUrl = useMemo(() => domain ? getFaviconUrl(url, 'google') : null, [domain, url]);
 
     useEffect(() => {
         let isMounted = true;
         setIsLoading(true);
 
         const resolveIcon = async () => {
-            // 1. FAST PATH: Check IndexedDB for Cloudinary Icon
-            if (cloudUrl) {
+            // 1. FAST PATH: Check IndexedDB for Icon
+            if (googleUrl) {
                 try {
-                    const cachedBlob = await iconCache.get(cloudUrl);
+                    const cachedBlob = await iconCache.get(googleUrl);
                     if (cachedBlob && isMounted) {
                         setDisplayUrl(URL.createObjectURL(cachedBlob));
                         setIsLoading(false);
                         return;
-                        // If cached, we assume it's good (self-healing should have happened already)
-                        // Or should we still race to see if there's a better one? 
-                        // For performance, trust the cache.
                     }
                 } catch (e) {
                     // Cache error, proceed to race
                 }
             }
 
-            // 2. SLOW PATH: Run Request Race (Google vs DDG vs Cloudinary)
+            // 2. SLOW PATH: Run Request Race (Google vs DDG)
             const best = await findBestFavicon(url);
 
             if (!isMounted) return;
@@ -50,20 +48,13 @@ export function Favicon({ url, title, size = 40, className = "" }: FaviconProps)
             if (best) {
                 setDisplayUrl(best.url);
 
-                // Optimization: If Cloudinary won, cache it for next time
-                if (best.source === 'cloudinary' && cloudUrl) {
-                    // Fetch/Blob/Store (supports CORS)
+                // Optimization: Cache it for next time
+                if (googleUrl) {
+                    // Fetch/Blob/Store
                     fetch(best.url).then(res => res.blob()).then(blob => {
-                        iconCache.set(cloudUrl, blob);
+                        iconCache.set(googleUrl, blob);
                     }).catch(() => { });
                 }
-
-                // Self-Healing: If we found a high-quality external icon, upload it!
-                // Constraint: Must be >= 128x128 to be worth replacing.
-                if (best.source !== 'cloudinary' && best.width >= 128 && domain) {
-                    uploadFaviconToCloudinary(domain, best.url).catch(console.error);
-                }
-
             } else {
                 // No valid icon found -> Letter Fallback
                 setDisplayUrl(null);
@@ -77,7 +68,7 @@ export function Favicon({ url, title, size = 40, className = "" }: FaviconProps)
         return () => {
             isMounted = false;
         };
-    }, [url, cloudUrl, domain]);
+    }, [url, googleUrl, domain]);
 
     const getIconContent = () => {
         // If no display URL and not loading, it means we failed to find an icon -> FAllBACK
@@ -115,7 +106,7 @@ export function Favicon({ url, title, size = 40, className = "" }: FaviconProps)
             style={{ width: size, height: size }}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.3 * animationMultiplier }}
         >
             <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-zinc-800">
                 {getIconContent()}
