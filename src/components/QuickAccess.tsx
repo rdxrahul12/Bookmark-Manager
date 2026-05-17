@@ -22,7 +22,7 @@ export function QuickAccess({ bookmarks }: QuickAccessProps) {
             href={bookmark.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="block rounded-[10px]"
+            className="block"
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{
@@ -32,14 +32,14 @@ export function QuickAccess({ bookmarks }: QuickAccessProps) {
               delay: index * 0.05 * animationMultiplier,
             }}
             whileHover={{
-              scale: 1.15,
-              y: -4,
+              scale: 1.05,
+              y: -2,
               transition: { type: "spring", stiffness: 400 / animationMultiplier, damping: 10 },
             }}
             whileTap={{ scale: 0.9 }}
             title={bookmark.title}
           >
-            <Favicon url={bookmark.url} title={bookmark.title} size={40} className="rounded-[10px]" />
+            <Favicon url={bookmark.url} title={bookmark.title} size={43} className="" />
           </motion.a>
         ))}
       </div>

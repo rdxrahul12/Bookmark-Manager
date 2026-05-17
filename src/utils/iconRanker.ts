@@ -1,19 +1,28 @@
-import { getFaviconUrl, getDomain } from "./faviconUtils";
+import { getFaviconUrl, getDomain, getCuratedIconUrl } from "./faviconUtils";
+import { extractLocalIcon } from "./localIconExtractor";
 
 interface IconCandidate {
-    source: 'google' | 'ddg';
+    source: 'curated' | 'local' | 'iconhorse' | 'clearbit' | 'google' | 'ddg';
     url: string;
     width: number;
     height: number;
+    isDataUrl?: boolean;
 }
 
 /**
- * Loads an image to determine its dimensions.
+ * Loads an image to determine its natural dimensions.
+ * Returns null if the image fails to load.
  */
-const probeImage = (url: string, source: IconCandidate['source']): Promise<IconCandidate | null> => {
+const probeImage = (url: string, source: IconCandidate['source'], timeoutMs = 6000): Promise<IconCandidate | null> => {
     return new Promise((resolve) => {
         const img = new Image();
+        const timer = setTimeout(() => {
+            img.src = '';
+            resolve(null);
+        }, timeoutMs);
+
         img.onload = () => {
+            clearTimeout(timer);
             resolve({
                 source,
                 url,
@@ -21,51 +30,108 @@ const probeImage = (url: string, source: IconCandidate['source']): Promise<IconC
                 height: img.naturalHeight,
             });
         };
-        img.onerror = () => resolve(null);
+        img.onerror = () => {
+            clearTimeout(timer);
+            resolve(null);
+        };
+        img.crossOrigin = 'anonymous';
         img.src = url;
     });
 };
 
 /**
- * Races multiple favicon sources to find the highest quality one.
- * Filters out small/generic icons.
+ * Robust multi-source icon extraction engine.
+ * 
+ * Extraction priority:
+ *   0. CURATED — hardcoded high-quality URLs for major services (Google, MS, etc.)
+ *   1. LOCAL   — Chrome extension background worker (Safari-style HTML parsing)
+ *   2. icon.horse — cloud service that does the same HTML parsing
+ *   3. Clearbit — high-res company logos
+ *   4. Google Favicons API
+ *   5. DuckDuckGo Icons
+ * 
+ * Design: Curated icons are checked FIRST (instant, guaranteed quality).
+ * Then local extraction is attempted.
+ * If both fail, we race 4 external APIs in parallel and pick the best.
  */
 export const findBestFavicon = async (pageUrl: string): Promise<IconCandidate | null> => {
     const domain = getDomain(pageUrl);
     if (!domain) return null;
 
-    const candidates: Promise<IconCandidate | null>[] = [
-        // 1. Google (High Res)
-        probeImage(getFaviconUrl(pageUrl, 'google'), 'google'),
+    // =============================
+    // TIER 0: Curated Icon Database
+    // =============================
+    // For Google Calendar, Maps, YouTube, etc. where automated extraction
+    // always fails because they redirect to login pages.
+    const curatedUrl = getCuratedIconUrl(pageUrl);
+    if (curatedUrl) {
+        const curated = await probeImage(curatedUrl, 'curated', 4000);
+        if (curated && curated.width >= 16) {
+            console.log(`[IconRanker] ✅ Curated icon for ${domain}: ${curated.width}x${curated.height}`);
+            return curated;
+        }
+        // If curated icon fails to load, fall through to other methods
+        console.warn(`[IconRanker] Curated icon failed for ${domain}, falling through...`);
+    }
 
-        // 2. DuckDuckGo (Backup)
-        probeImage(getFaviconUrl(pageUrl, 'ddg'), 'ddg'),
-    ];
+    // =============================
+    // TIER 1: Local Extraction (Extension only)
+    // =============================
+    try {
+        const localDataUrl = await extractLocalIcon(pageUrl);
+        if (localDataUrl) {
+            const localCandidate = await probeImage(localDataUrl, 'local');
+            if (localCandidate && localCandidate.width >= 32) {
+                console.log(`[IconRanker] ✅ Local icon for ${domain}: ${localCandidate.width}x${localCandidate.height}`);
+                return { ...localCandidate, isDataUrl: true };
+            }
+        }
+    } catch (err) {
+        console.warn(`[IconRanker] Local extraction failed for ${domain}:`, err);
+    }
 
-    const results = await Promise.all(candidates);
+    // =============================
+    // TIER 2: Race All External APIs
+    // =============================
+    // Fire all 4 sources in parallel, pick the best result
+    const candidates = await Promise.all([
+        probeImage(getFaviconUrl(pageUrl, 'iconhorse'), 'iconhorse', 5000),
+        probeImage(getFaviconUrl(pageUrl, 'clearbit'), 'clearbit', 5000),
+        probeImage(getFaviconUrl(pageUrl, 'google'), 'google', 5000),
+        probeImage(getFaviconUrl(pageUrl, 'ddg'), 'ddg', 5000),
+    ]);
 
-    // Filter valid results
-    const validIcons = results.filter((icon): icon is IconCandidate => {
+    // Filter valid results (must be at least 16x16)
+    const validIcons = candidates.filter((icon): icon is IconCandidate => {
         if (!icon) return false;
-
-        // Ignore small icons (likely generic fallbacks)
-        // Google's generic globe is 16x16. 
-        // We want at least 32x32 to look decent.
-        if (icon.width <= 16) return false;
-
+        if (icon.width < 16) return false;
         return true;
     });
 
-    if (validIcons.length === 0) return null;
+    if (validIcons.length === 0) {
+        console.log(`[IconRanker] ❌ No valid icons found for ${domain}`);
+        return null;
+    }
 
-    // Sort by Size (Descending) -> Then by Priority (Google first)
+    // Score each icon: bigger = better, with source-based tiebreaking
+    const SOURCE_PRIORITY: Record<string, number> = {
+        iconhorse: 1,
+        clearbit: 2,
+        google: 3,
+        ddg: 4,
+    };
+
     validIcons.sort((a, b) => {
-        if (b.width !== a.width) return b.width - a.width;
-        // If sizes are equal, prefer Google
-        if (a.source === 'google') return -1;
-        if (b.source === 'google') return 1;
-        return 0;
+        // Primary: largest icon wins
+        const sizeA = Math.max(a.width, a.height);
+        const sizeB = Math.max(b.width, b.height);
+        if (sizeB !== sizeA) return sizeB - sizeA;
+
+        // Secondary: prefer icon.horse > clearbit > google > ddg
+        return (SOURCE_PRIORITY[a.source] || 99) - (SOURCE_PRIORITY[b.source] || 99);
     });
 
-    return validIcons[0]; // The Winner
+    const winner = validIcons[0];
+    console.log(`[IconRanker] ✅ ${winner.source} for ${domain}: ${winner.width}x${winner.height} (${validIcons.length} sources responded)`);
+    return winner;
 };

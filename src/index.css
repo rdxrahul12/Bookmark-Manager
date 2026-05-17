@@ -108,6 +108,17 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
+
+  /* Hide scrollbar globally */
+  html, body {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 @layer utilities {
@@ -137,5 +148,16 @@
   /* Glow effect for active states */
   .glow-primary {
     box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+  }
+
+  /* Hide scrollbar utility */
+  .no-scrollbar::-webkit-scrollbar,
+  .element::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar,
+  .element {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
   }
 }

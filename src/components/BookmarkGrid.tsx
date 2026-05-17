@@ -37,7 +37,7 @@ export function BookmarkGrid({
 
   return (
     <SortableContext items={bookmarks.map((b) => b.id)} strategy={rectSortingStrategy}>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-4 xs:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-y-8 gap-x-4 md:gap-y-10 md:gap-x-6 justify-items-center py-6 px-4">
         <AnimatePresence mode="popLayout">
           {bookmarks.map((bookmark, index) => (
             <SortableBookmarkCard

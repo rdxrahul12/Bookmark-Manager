@@ -1,9 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
-import { getDomain, getColorForDomain, getFaviconUrl } from "@/utils/faviconUtils";
-import { findBestFavicon } from "@/utils/iconRanker";
-import { iconCache } from "@/utils/iconCache";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useUiPreferences } from "@/contexts/UiPreferencesContext";
+import { globalIconEngine, makeAvatar, getDomain as engineGetDomain, IconResult } from "@/utils/icon-engine";
 
 interface FaviconProps {
     url: string;
@@ -12,98 +10,50 @@ interface FaviconProps {
     className?: string;
 }
 
+// Inline hook for integrating the new MV3 Engine into React state
+export function useIcon(url: string) {
+  const [state, setState] = useState<IconResult>(() => makeAvatar(engineGetDomain(url)));
+
+  useEffect(() => {
+    if (!url) return;
+    setState(makeAvatar(engineGetDomain(url))); // instant placeholder
+
+    globalIconEngine.fetchIcon(url).then(result => {
+      setState(result);
+    });
+  }, [url]);
+
+  return {
+    dataUrl: state.dataUrl,
+    quality: state.quality,
+    source:  state.source,
+    loading: state.source === 'generated-avatar',
+  };
+}
+
 export function Favicon({ url, title, size = 40, className = "" }: FaviconProps) {
     const { animationMultiplier } = useUiPreferences();
-    const [displayUrl, setDisplayUrl] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-
-    const domain = getDomain(url);
-    const color = useMemo(() => getColorForDomain(domain), [domain]);
-    const googleUrl = useMemo(() => domain ? getFaviconUrl(url, 'google') : null, [domain, url]);
-
-    useEffect(() => {
-        let isMounted = true;
-        setIsLoading(true);
-
-        const resolveIcon = async () => {
-            // 1. FAST PATH: Check IndexedDB for Icon
-            if (googleUrl) {
-                try {
-                    const cachedBlob = await iconCache.get(googleUrl);
-                    if (cachedBlob && isMounted) {
-                        setDisplayUrl(URL.createObjectURL(cachedBlob));
-                        setIsLoading(false);
-                        return;
-                    }
-                } catch (e) {
-                    // Cache error, proceed to race
-                }
-            }
-
-            // 2. SLOW PATH: Run Request Race (Google vs DDG)
-            const best = await findBestFavicon(url);
-
-            if (!isMounted) return;
-
-            if (best) {
-                setDisplayUrl(best.url);
-
-                // Optimization: Cache it for next time
-                if (googleUrl) {
-                    // Fetch/Blob/Store
-                    fetch(best.url).then(res => res.blob()).then(blob => {
-                        iconCache.set(googleUrl, blob);
-                    }).catch(() => { });
-                }
-            } else {
-                // No valid icon found -> Letter Fallback
-                setDisplayUrl(null);
-            }
-
-            setIsLoading(false);
-        };
-
-        resolveIcon();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [url, googleUrl, domain]);
+    const { dataUrl, loading, source } = useIcon(url);
 
     const getIconContent = () => {
-        // If no display URL and not loading, it means we failed to find an icon -> FAllBACK
-        if (!displayUrl && !isLoading) {
-            const letter = domain ? domain.charAt(0).toUpperCase() : (title ? title.charAt(0).toUpperCase() : '?');
-            return (
-                <div
-                    className="flex items-center justify-center w-full h-full text-white font-bold text-lg select-none"
-                    style={{ backgroundColor: color }}
-                >
-                    {letter}
-                </div>
-            );
-        }
-
-        // Loading state
-        if (isLoading) {
-            return <div className="w-full h-full bg-secondary/50 animate-pulse" />;
-        }
-
-        // Success state
+        // The generated-avatar itself is rendered into `dataUrl` so we can just use the img tag immediately!
         return (
             <img
-                src={displayUrl!}
+                src={dataUrl}
                 alt={`${title} favicon`}
-                className="w-full h-full object-cover"
-            // No onLoad/onError needed here, probing was done in iconRanker
+                className={`w-full h-full object-contain p-[10%] drop-shadow-sm transition-opacity duration-300 ${loading ? 'opacity-80' : 'opacity-100'}`}
             />
         );
     };
 
     return (
         <motion.div
-            className={`relative overflow-hidden rounded-[10px] bg-secondary/30 shrink-0 ${className}`}
-            style={{ width: size, height: size }}
+            className={`relative overflow-hidden bg-secondary/30 shrink-0 ${className} shadow-sm backdrop-blur-sm transition-shadow duration-300`}
+            style={{ 
+                width: size, 
+                height: size, 
+                borderRadius: `${size * 0.225}px` // Apple Squircle 22.5% ratio
+            }}
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3 * animationMultiplier }}
@@ -113,7 +63,10 @@ export function Favicon({ url, title, size = 40, className = "" }: FaviconProps)
             </div>
 
             {/* Subtle Inner Border/Shadow for Consistency */}
-            <div className="absolute inset-0 rounded-[10px] ring-1 ring-black/5 dark:ring-white/10 pointer-events-none" />
+            <div 
+                className="absolute inset-0 ring-1 ring-black/5 dark:ring-white/10 pointer-events-none" 
+                style={{ borderRadius: `${size * 0.225}px` }}
+            />
         </motion.div>
     );
 }
