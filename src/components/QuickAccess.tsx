@@ -1,14 +1,16 @@
+import { memo } from "react";
 import { motion } from "framer-motion";
+
 import { Bookmark } from "@/types/bookmark";
 import { Favicon } from "./Favicon";
-import { useUiPreferences } from "@/contexts/UiPreferencesContext";
+import { useAnimationMultiplier } from "@/stores/uiPrefsStore";
 
 interface QuickAccessProps {
   bookmarks: Bookmark[];
 }
 
-export function QuickAccess({ bookmarks }: QuickAccessProps) {
-  const { animationMultiplier } = useUiPreferences();
+function QuickAccessImpl({ bookmarks }: QuickAccessProps) {
+  const animationMultiplier = useAnimationMultiplier();
 
   if (bookmarks.length === 0) return null;
 
@@ -22,8 +24,8 @@ export function QuickAccess({ bookmarks }: QuickAccessProps) {
             href={bookmark.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="block"
-            initial={{ opacity: 0, scale: 0 }}
+            className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-xl"
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{
               type: "spring",
@@ -36,13 +38,16 @@ export function QuickAccess({ bookmarks }: QuickAccessProps) {
               y: -2,
               transition: { type: "spring", stiffness: 400 / animationMultiplier, damping: 10 },
             }}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.92 }}
             title={bookmark.title}
           >
-            <Favicon url={bookmark.url} title={bookmark.title} size={43} className="" />
+            <Favicon url={bookmark.url} title={bookmark.title} size={43} />
           </motion.a>
         ))}
       </div>
     </div>
   );
 }
+
+export const QuickAccess = memo(QuickAccessImpl);
+QuickAccess.displayName = "QuickAccess";

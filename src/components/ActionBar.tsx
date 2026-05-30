@@ -1,23 +1,25 @@
-import { useRef, useState } from "react";
+import { memo } from "react";
 import { motion } from "framer-motion";
 import { Plus, Save } from "lucide-react";
-import { useUiPreferences } from "@/contexts/UiPreferencesContext";
+
+import { useAnimationMultiplier } from "@/stores/uiPrefsStore";
 
 interface ActionBarProps {
   onAddBookmark: () => void;
-  onSaveSession?: () => void;
+  onSaveSession: (() => void) | null;
 }
 
-export function ActionBar({ onAddBookmark, onSaveSession }: ActionBarProps) {
-  const { animationMultiplier } = useUiPreferences();
+function ActionBarImpl({ onAddBookmark, onSaveSession }: ActionBarProps) {
+  const animationMultiplier = useAnimationMultiplier();
 
   return (
     <div className="flex items-center gap-3">
-      {/* Add Bookmark button - Primary action with pulse */}
       <motion.button
+        type="button"
         onClick={onAddBookmark}
-        className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center animate-pulse-glow"
+        aria-label="Add bookmark"
         title="Add Bookmark"
+        className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center animate-pulse-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         transition={{ type: "spring", stiffness: 400 / animationMultiplier, damping: 17 }}
@@ -30,14 +32,15 @@ export function ActionBar({ onAddBookmark, onSaveSession }: ActionBarProps) {
         </motion.div>
       </motion.button>
 
-      {/* Save Session button */}
       {onSaveSession && (
         <motion.button
+          type="button"
           onClick={onSaveSession}
-          className="h-10 w-10 rounded-xl bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-secondary/80"
+          aria-label="Save current session"
+          title="Save all currently open tabs"
+          className="h-10 w-10 rounded-xl bg-secondary text-secondary-foreground flex items-center justify-center hover:bg-secondary/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          title="Save all currently open tabs"
           transition={{ type: "spring", stiffness: 400 / animationMultiplier, damping: 17 }}
         >
           <motion.div
@@ -51,3 +54,6 @@ export function ActionBar({ onAddBookmark, onSaveSession }: ActionBarProps) {
     </div>
   );
 }
+
+export const ActionBar = memo(ActionBarImpl);
+ActionBar.displayName = "ActionBar";

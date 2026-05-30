@@ -44,4 +44,9 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = "Button";
 
+// `buttonVariants` is exported alongside the component because shadcn's
+// auxiliary primitives (calendar, etc.) reuse the variant config. The
+// react-refresh rule warns about non-component exports, but disabling here is
+// fine — fast refresh on this file is harmless.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants };

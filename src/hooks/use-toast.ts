@@ -19,14 +19,18 @@ const actionTypes = {
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const;
 
+type ActionType = typeof actionTypes;
+
+// Reference the const so it isn't lint-flagged as unused — it's read via
+// `typeof` to derive ActionType, but the variable still has to exist.
+void actionTypes;
+
 let count = 0;
 
 function genId() {
   count = (count + 1) % Number.MAX_SAFE_INTEGER;
   return count.toString();
 }
-
-type ActionType = typeof actionTypes;
 
 type Action =
   | {

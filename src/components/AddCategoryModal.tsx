@@ -1,8 +1,10 @@
-import { useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Check } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Check } from "lucide-react";
+
 import { Input } from "@/components/ui/input";
-import { useUiPreferences } from "@/contexts/UiPreferencesContext";
+import { Modal } from "@/components/ui/modal";
+import { cn } from "@/lib/utils";
 
 interface AddCategoryModalProps {
   isOpen: boolean;
@@ -10,138 +12,171 @@ interface AddCategoryModalProps {
   onSave: (category: { name: string; emoji: string }) => void;
 }
 
+const NAME_MAX_LEN = 40;
+
 const EMOJI_OPTIONS = [
+  "📁",
+  "🌐",
+  "💬",
+  "🧑‍💻",
+  "👩‍💻",
+  "🛍️",
+  "🛠️",
+  "📌",
+  "📚",
+  "🎮",
+  "🎵",
+  "🎬",
+  "📰",
+  "💼",
+  "📊",
+  "🧠",
+  "🏠",
+  "✈️",
+  "🍳",
+  "💰",
 ];
+
+interface ValidationErrors {
+  name?: string;
+}
+
+function validate(name: string): ValidationErrors {
+  const errors: ValidationErrors = {};
+  const trimmed = name.trim();
+  if (!trimmed) errors.name = "Name is required";
+  else if (trimmed.length > NAME_MAX_LEN) {
+    errors.name = `Keep it under ${NAME_MAX_LEN} characters`;
+  }
+  return errors;
+}
 
 export function AddCategoryModal({ isOpen, onClose, onSave }: AddCategoryModalProps) {
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("📁");
   const [showSuccess, setShowSuccess] = useState(false);
-  const { animationMultiplier } = useUiPreferences();
+  const [touched, setTouched] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  const handleSave = useCallback(() => {
-    if (!name.trim()) return;
+  useEffect(() => {
+    if (!isOpen) return;
+    setName("");
+    setEmoji("📁");
+    setShowSuccess(false);
+    setTouched(false);
+    setSubmitAttempted(false);
+  }, [isOpen]);
 
-    onSave({ name: name.trim(), emoji });
+  const errors = useMemo(() => validate(name), [name]);
+  const isValid = Object.keys(errors).length === 0;
+  const showNameError = (touched || submitAttempted) && !!errors.name;
 
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      onClose();
-      setName("");
-      setEmoji("📁");
-    }, 500);
-  }, [name, emoji, onSave, onClose]);
+  const handleSave = useCallback(
+    (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
+      setSubmitAttempted(true);
+      if (!isValid) return;
+
+      onSave({ name: name.trim(), emoji });
+      setShowSuccess(true);
+      const timer = setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+      }, 500);
+      return () => clearTimeout(timer);
+    },
+    [isValid, name, emoji, onSave, onClose],
+  );
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-
-          {/* Modal */}
-          <motion.div
-            className="fixed inset-0 flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="w-full max-w-sm rounded-2xl bg-background neu-raised p-6"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              transition={{ type: "spring", stiffness: 300 / animationMultiplier, damping: 25 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-foreground">Add Category</h2>
-                <motion.button
-                  onClick={onClose}
-                  className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center"
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </motion.button>
-              </div>
-
-              {/* Emoji picker */}
-              <div className="mb-4">
-                <label className="text-sm font-medium text-foreground mb-2 block">
-                  Choose an emoji
-                </label>
-                <div className="grid grid-cols-10 gap-1">
-                  {EMOJI_OPTIONS.map((e, index) => (
-                    <motion.button
-                      key={e}
-                      onClick={() => setEmoji(e)}
-                      className={`h-8 w-8 rounded-lg text-lg flex items-center justify-center ${emoji === e
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary hover:bg-accent"
-                        }`}
-                      initial={{ opacity: 0, scale: 0 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.01 * animationMultiplier }}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                    >
-                      {e}
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Name input */}
-              <div className="mb-6">
-                <label className="text-sm font-medium text-foreground mb-2 block">
-                  Category name
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{emoji}</span>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter category name"
-                    className="neu-inset border-0 bg-background"
-                  />
-                </div>
-              </div>
-
-              {/* Save button */}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Add Category"
+      contentClassName="max-w-sm"
+    >
+      <form onSubmit={handleSave} noValidate>
+        <div className="mb-4">
+          <span className="text-sm font-medium text-foreground mb-2 block">
+            Choose an emoji
+          </span>
+          <div className="grid grid-cols-10 gap-1" role="radiogroup" aria-label="Emoji">
+            {EMOJI_OPTIONS.map((option) => (
               <motion.button
-                onClick={handleSave}
-                disabled={!name.trim()}
-                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                animate={showSuccess ? { scale: [1, 1.1, 1] } : {}}
-              >
-                {showSuccess ? (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="flex items-center justify-center gap-2"
-                  >
-                    <Check className="h-5 w-5" />
-                    Added!
-                  </motion.span>
-                ) : (
-                  "Add Category"
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={emoji === option}
+                aria-label={`Choose ${option}`}
+                onClick={() => setEmoji(option)}
+                className={cn(
+                  "h-8 w-8 rounded-lg text-lg flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                  emoji === option
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary hover:bg-accent",
                 )}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                {option}
               </motion.button>
-            </motion.div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-6 space-y-2">
+          <label
+            htmlFor="category-name"
+            className="text-sm font-medium text-foreground block"
+          >
+            Category name
+          </label>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl" aria-hidden>
+              {emoji}
+            </span>
+            <Input
+              id="category-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => setTouched(true)}
+              placeholder="Enter category name"
+              autoFocus
+              maxLength={NAME_MAX_LEN}
+              autoComplete="off"
+              aria-invalid={showNameError || undefined}
+              aria-describedby={showNameError ? "category-name-error" : undefined}
+              className={cn(
+                "neu-inset border-0 bg-background",
+                showNameError && "ring-2 ring-destructive",
+              )}
+            />
+          </div>
+          {showNameError && (
+            <p id="category-name-error" role="alert" className="text-xs text-destructive">
+              {errors.name}
+            </p>
+          )}
+        </div>
+
+        <motion.button
+          type="submit"
+          disabled={!isValid && submitAttempted}
+          className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          whileHover={isValid ? { scale: 1.02 } : undefined}
+          whileTap={isValid ? { scale: 0.98 } : undefined}
+          animate={showSuccess ? { scale: [1, 1.06, 1] } : undefined}
+        >
+          {showSuccess ? (
+            <span className="flex items-center justify-center gap-2">
+              <Check className="h-5 w-5" />
+              Added!
+            </span>
+          ) : (
+            "Add Category"
+          )}
+        </motion.button>
+      </form>
+    </Modal>
   );
 }

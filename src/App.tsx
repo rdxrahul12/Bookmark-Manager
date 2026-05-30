@@ -1,30 +1,29 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { lazy, Suspense } from "react";
 import { HashRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
-import { UiPreferencesProvider } from "./contexts/UiPreferencesContext";
 
-const queryClient = new QueryClient();
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { AppLoader } from "@/components/AppLoader";
+import Index from "./pages/Index";
+
+// 404 page is split off — it should never appear on a happy path.
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <UiPreferencesProvider>
-        <Toaster />
-        <Sonner />
-        <HashRouter>
+  <ErrorBoundary>
+    <TooltipProvider delayDuration={250}>
+      <Toaster />
+      <HashRouter>
+        <Suspense fallback={<AppLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </HashRouter>
-      </UiPreferencesProvider>
+        </Suspense>
+      </HashRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;

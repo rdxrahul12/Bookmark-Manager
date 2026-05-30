@@ -6,6 +6,16 @@ export default {
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
   prefix: "",
   theme: {
+    screens: {
+      xs: "420px",
+      sm: "640px",
+      md: "768px",
+      lg: "1024px",
+      xl: "1280px",
+      "2xl": "1536px",
+      "3xl": "1800px",
+      "4xl": "2200px",
+    },
     container: {
       center: true,
       padding: "2rem",
@@ -14,6 +24,13 @@ export default {
       },
     },
     extend: {
+      gridTemplateColumns: {
+        "13": "repeat(13, minmax(0, 1fr))",
+        "14": "repeat(14, minmax(0, 1fr))",
+        "15": "repeat(15, minmax(0, 1fr))",
+        "16": "repeat(16, minmax(0, 1fr))",
+        "18": "repeat(18, minmax(0, 1fr))",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

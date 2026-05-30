@@ -1,21 +1,31 @@
 {
-    "manifest_version": 3,
-    "name": "Bookmark Delight",
-    "version": "1.1",
-    "description": "Manage your bookmarks with ease",
-    "chrome_url_overrides": {
-        "newtab": "index.html"
-    },
-    "background": {
-        "service_worker": "background.js"
-    },
-    "permissions": [
-        "storage",
-        "unlimitedStorage",
-        "tabs",
-        "favicon"
-    ],
-    "host_permissions": [
-        "<all_urls>"
-    ]
+  "manifest_version": 3,
+  "name": "Bookmark Manager",
+  "short_name": "Bookmarks",
+  "version": "1.2.0",
+  "description": "A fast, privacy-friendly bookmark manager that replaces your new tab.",
+  "minimum_chrome_version": "108",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Open Bookmark Manager",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["storage", "tabs", "favicon", "scripting"],
+  "host_permissions": ["<all_urls>"]
 }

@@ -1,49 +1,44 @@
+import { memo } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Bookmark, Category } from "@/types/bookmark";
+import { SortableContext, rectSortingStrategy } from "@dnd-kit/sortable";
+
+import { Bookmark } from "@/types/bookmark";
 import { SortableBookmarkCard } from "./SortableBookmarkCard";
-import {
-  SortableContext,
-  rectSortingStrategy,
-} from "@dnd-kit/sortable";
 
 interface BookmarkGridProps {
   bookmarks: Bookmark[];
-  categories: Category[];
   onEdit: (bookmark: Bookmark) => void;
   onDelete: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onReorder: (activeId: string, overId: string) => void;
 }
 
-export function BookmarkGrid({
-  bookmarks,
-  categories,
-  onEdit,
-  onDelete,
-  onTogglePin,
-  onReorder,
-}: BookmarkGridProps) {
-  const getCategoryById = (id: string) => categories.find((c) => c.id === id);
-
+function BookmarkGridImpl({ bookmarks, onEdit, onDelete, onTogglePin }: BookmarkGridProps) {
   if (bookmarks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-        <div className="text-6xl mb-4">📚</div>
+        <div className="text-6xl mb-4" aria-hidden>
+          📚
+        </div>
         <p className="text-lg font-medium">No bookmarks yet</p>
         <p className="text-sm">Add your first bookmark to get started!</p>
       </div>
     );
   }
 
+  const ids = bookmarks.map((b) => b.id);
+
   return (
-    <SortableContext items={bookmarks.map((b) => b.id)} strategy={rectSortingStrategy}>
-      <div className="grid grid-cols-4 xs:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-y-8 gap-x-4 md:gap-y-10 md:gap-x-6 justify-items-center py-6 px-4">
+    <SortableContext items={ids} strategy={rectSortingStrategy}>
+      {/* Grid scales from 4 columns on a phone all the way to 18 on an
+          ultra-wide display, so icons stay roughly the same physical size
+          regardless of viewport width and the page never has dead side
+          margins. */}
+      <div className="grid grid-cols-4 xs:grid-cols-5 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 2xl:grid-cols-14 3xl:grid-cols-16 4xl:grid-cols-18 gap-y-8 gap-x-4 md:gap-y-10 md:gap-x-6 justify-items-center py-6 px-4">
         <AnimatePresence mode="popLayout">
           {bookmarks.map((bookmark, index) => (
             <SortableBookmarkCard
               key={bookmark.id}
               bookmark={bookmark}
-              category={getCategoryById(bookmark.category)}
               onEdit={onEdit}
               onDelete={onDelete}
               onTogglePin={onTogglePin}
@@ -55,3 +50,6 @@ export function BookmarkGrid({
     </SortableContext>
   );
 }
+
+export const BookmarkGrid = memo(BookmarkGridImpl);
+BookmarkGrid.displayName = "BookmarkGrid";

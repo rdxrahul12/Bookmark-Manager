@@ -1,17 +1,56 @@
-import { useState, useCallback, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, Check, Link, Tag } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import { Check, Link as LinkIcon, Tag } from "lucide-react";
+
 import { Bookmark, Category } from "@/types/bookmark";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
-import { useUiPreferences } from "@/contexts/UiPreferencesContext";
+import { Modal } from "@/components/ui/modal";
+import { normalizeUrl } from "@/lib/url";
+import { cn } from "@/lib/utils";
 
 interface AddBookmarkModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (bookmark: Omit<Bookmark, "id" | "createdAt">) => void;
   categories: Category[];
-  editingBookmark?: Bookmark | null;
+  editingBookmark: Bookmark | null;
+}
+
+interface ValidationErrors {
+  title?: string;
+  url?: string;
+  category?: string;
+}
+
+const TITLE_MAX_LEN = 80;
+
+function validate(
+  title: string,
+  url: string,
+  category: string,
+  categories: Category[],
+): { errors: ValidationErrors; normalizedUrl: string | null } {
+  const errors: ValidationErrors = {};
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) errors.title = "Title is required";
+  else if (trimmedTitle.length > TITLE_MAX_LEN) {
+    errors.title = `Keep it under ${TITLE_MAX_LEN} characters`;
+  }
+
+  const trimmedUrl = url.trim();
+  let normalized: string | null = null;
+  if (!trimmedUrl) {
+    errors.url = "URL is required";
+  } else {
+    normalized = normalizeUrl(trimmedUrl);
+    if (!normalized) errors.url = "Enter a valid website (e.g. example.com)";
+  }
+
+  if (!category || !categories.some((c) => c.id === category)) {
+    errors.category = "Pick a category";
+  }
+
+  return { errors, normalizedUrl: normalized };
 }
 
 export function AddBookmarkModal({
@@ -23,195 +62,202 @@ export function AddBookmarkModal({
 }: AddBookmarkModalProps) {
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
-  const [category, setCategory] = useState(categories[0]?.id || "other");
+  const [category, setCategory] = useState<string>(
+    () => editingBookmark?.category ?? categories[0]?.id ?? "",
+  );
   const [isPinned, setIsPinned] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const { toast } = useToast();
-  const { animationMultiplier } = useUiPreferences();
+  const [touched, setTouched] = useState({ title: false, url: false });
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
-  // Reset form when modal opens or editingBookmark changes
+  // Re-seed form whenever the modal opens or editing target changes.
   useEffect(() => {
-    if (isOpen) {
-      setTitle(editingBookmark?.title || "");
-      setUrl(editingBookmark?.url || "");
-      setCategory(editingBookmark?.category || categories[0]?.id || "other");
-      setIsPinned(editingBookmark?.isPinned || false);
-    }
+    if (!isOpen) return;
+    setTitle(editingBookmark?.title ?? "");
+    setUrl(editingBookmark?.url ?? "");
+    setCategory(editingBookmark?.category ?? categories[0]?.id ?? "");
+    setIsPinned(editingBookmark?.isPinned ?? false);
+    setShowSuccess(false);
+    setTouched({ title: false, url: false });
+    setSubmitAttempted(false);
   }, [isOpen, editingBookmark, categories]);
 
-  const handleSave = useCallback(() => {
-    if (!title.trim() || !url.trim()) return;
+  // Validation runs every render — cheap, and keeps the submit button + the
+  // inline error messages in sync without separate effects.
+  const { errors, normalizedUrl } = useMemo(
+    () => validate(title, url, category, categories),
+    [title, url, category, categories],
+  );
+  const isValid = Object.keys(errors).length === 0;
 
-    let finalUrl = url.trim();
-    if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
-      finalUrl = "https://" + finalUrl;
-    }
+  // Show errors only after the field has been touched OR a submit was tried.
+  const showTitleError = (touched.title || submitAttempted) && !!errors.title;
+  const showUrlError = (touched.url || submitAttempted) && !!errors.url;
+  const showCategoryError = submitAttempted && !!errors.category;
 
-    try {
-      new URL(finalUrl);
-    } catch {
-      toast({
-        title: "Invalid URL",
-        description: "Please enter a valid website address.",
-        variant: "destructive",
+  const handleSave = useCallback(
+    (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
+      setSubmitAttempted(true);
+      if (!isValid || !normalizedUrl) return;
+
+      onSave({
+        title: title.trim(),
+        url: normalizedUrl,
+        category,
+        isPinned,
       });
-      return;
-    }
 
-    onSave({
-      title: title.trim(),
-      url: finalUrl,
-      category,
-      isPinned,
-    });
-
-    setShowSuccess(true);
-    setTimeout(() => {
-      setShowSuccess(false);
-      onClose();
-      setTitle("");
-      setUrl("");
-      setCategory(categories[0]?.id || "other");
-      setIsPinned(false);
-    }, 500);
-  }, [title, url, category, isPinned, onSave, onClose, categories]);
+      setShowSuccess(true);
+      const timer = setTimeout(() => {
+        setShowSuccess(false);
+        onClose();
+      }, 500);
+      return () => clearTimeout(timer);
+    },
+    [isValid, normalizedUrl, title, category, isPinned, onSave, onClose],
+  );
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-
-          {/* Modal */}
-          <motion.div
-            className="fixed inset-0 flex items-center justify-center z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          >
-            <motion.div
-              className="w-full max-w-md rounded-2xl bg-background neu-raised p-6"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              transition={{ type: "spring", stiffness: 300 / animationMultiplier, damping: 25 }}
-              onClick={(e) => e.stopPropagation()}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={editingBookmark ? "Edit Bookmark" : "Add Bookmark"}
+    >
+      <form onSubmit={handleSave} noValidate>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label
+              htmlFor="bookmark-title"
+              className="text-sm font-medium text-foreground flex items-center gap-2"
             >
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-foreground">
-                  {editingBookmark ? "Edit Bookmark" : "Add Bookmark"}
-                </h2>
+              <Tag className="h-4 w-4 text-primary" aria-hidden />
+              Title
+            </label>
+            <Input
+              id="bookmark-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, title: true }))}
+              placeholder="My Favorite Site"
+              autoFocus
+              maxLength={TITLE_MAX_LEN}
+              autoComplete="off"
+              aria-invalid={showTitleError || undefined}
+              aria-describedby={showTitleError ? "bookmark-title-error" : undefined}
+              className={cn(
+                "neu-inset border-0 bg-background",
+                showTitleError && "ring-2 ring-destructive",
+              )}
+            />
+            {showTitleError && (
+              <p id="bookmark-title-error" role="alert" className="text-xs text-destructive">
+                {errors.title}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label
+              htmlFor="bookmark-url"
+              className="text-sm font-medium text-foreground flex items-center gap-2"
+            >
+              <LinkIcon className="h-4 w-4 text-primary" aria-hidden />
+              URL
+            </label>
+            <Input
+              id="bookmark-url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, url: true }))}
+              placeholder="https://example.com"
+              autoComplete="url"
+              inputMode="url"
+              aria-invalid={showUrlError || undefined}
+              aria-describedby={showUrlError ? "bookmark-url-error" : undefined}
+              className={cn(
+                "neu-inset border-0 bg-background",
+                showUrlError && "ring-2 ring-destructive",
+              )}
+            />
+            {showUrlError && (
+              <p id="bookmark-url-error" role="alert" className="text-xs text-destructive">
+                {errors.url}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-foreground">Category</span>
+            <div
+              className="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Category"
+              aria-invalid={showCategoryError || undefined}
+            >
+              {categories.map((cat) => (
                 <motion.button
-                  onClick={onClose}
-                  className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center"
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
+                  key={cat.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={category === cat.id}
+                  onClick={() => setCategory(cat.id)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                    category === cat.id
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-foreground",
+                  )}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <X className="h-4 w-4 text-muted-foreground" />
+                  {cat.emoji && <span aria-hidden>{cat.emoji}</span>}
+                  <span>{cat.name}</span>
                 </motion.button>
-              </div>
+              ))}
+            </div>
+            {showCategoryError && (
+              <p role="alert" className="text-xs text-destructive">
+                {errors.category}
+              </p>
+            )}
+          </div>
 
-              {/* Form */}
-              <div className="space-y-4">
-                {/* Title input */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Tag className="h-4 w-4 text-primary" />
-                    Title
-                  </label>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="My Favorite Site"
-                    className="neu-inset border-0 bg-background"
-                  />
-                </div>
+          <motion.button
+            type="button"
+            onClick={() => setIsPinned((v) => !v)}
+            aria-pressed={isPinned}
+            className={cn(
+              "w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+              isPinned ? "bg-primary text-primary-foreground" : "neu-raised-sm text-foreground",
+            )}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            📌 {isPinned ? "Pinned to Quick Access" : "Pin to Quick Access"}
+          </motion.button>
+        </div>
 
-                {/* URL input */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                    <Link className="h-4 w-4 text-primary" />
-                    URL
-                  </label>
-                  <Input
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    placeholder="https://example.com"
-                    className="neu-inset border-0 bg-background"
-                  />
-                </div>
-
-                {/* Category selection */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Category</label>
-                  <div className="flex flex-wrap gap-2">
-                    {categories.map((cat) => (
-                      <motion.button
-                        key={cat.id}
-                        onClick={() => setCategory(cat.id)}
-                        className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 ${category === cat.id
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-secondary text-foreground"
-                          }`}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <span>{cat.emoji}</span>
-                        <span>{cat.name}</span>
-                      </motion.button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Pin toggle */}
-                <motion.button
-                  onClick={() => setIsPinned(!isPinned)}
-                  className={`w-full py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-2 ${isPinned
-                    ? "bg-primary text-primary-foreground"
-                    : "neu-raised-sm text-foreground"
-                    }`}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  📌 {isPinned ? "Pinned to Quick Access" : "Pin to Quick Access"}
-                </motion.button>
-              </div>
-
-              {/* Save button */}
-              <motion.button
-                onClick={handleSave}
-                disabled={!title.trim() || !url.trim()}
-                className="mt-6 w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                animate={showSuccess ? { scale: [1, 1.1, 1] } : {}}
-              >
-                {showSuccess ? (
-                  <motion.span
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="flex items-center justify-center gap-2"
-                  >
-                    <Check className="h-5 w-5" />
-                    Saved!
-                  </motion.span>
-                ) : (
-                  editingBookmark ? "Update Bookmark" : "Add Bookmark"
-                )}
-              </motion.button>
-            </motion.div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+        <motion.button
+          type="submit"
+          disabled={!isValid && submitAttempted}
+          className="mt-6 w-full py-3 rounded-xl bg-primary text-primary-foreground font-medium disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          whileHover={isValid ? { scale: 1.02 } : undefined}
+          whileTap={isValid ? { scale: 0.98 } : undefined}
+          animate={showSuccess ? { scale: [1, 1.06, 1] } : undefined}
+        >
+          {showSuccess ? (
+            <span className="flex items-center justify-center gap-2">
+              <Check className="h-5 w-5" />
+              Saved!
+            </span>
+          ) : editingBookmark ? (
+            "Update Bookmark"
+          ) : (
+            "Add Bookmark"
+          )}
+        </motion.button>
+      </form>
+    </Modal>
   );
 }
